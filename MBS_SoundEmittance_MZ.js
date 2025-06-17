@@ -1,12 +1,12 @@
 //=============================================================================
-// MBS - Sound Emittance MZ (v2.1.1)
+// MBS - Sound Emittance MZ (v2.1.2)
 //-----------------------------------------------------------------------------
 // By Masked, adapted for RPG Maker MZ with enhancements.
 //=============================================================================
 
 /*:
  * @target MZ
- * @plugindesc [v2.1.1] Makes events emit 3D positional audio that reacts to player movement and direction.
+ * @plugindesc [v2.1.2] Makes events emit 3D positional audio that reacts to player movement and direction.
  * @author Masked, et al.
  * @url https://forums.rpgmakerweb.com/index.php
  *
@@ -214,12 +214,17 @@
  *
  * @help
  * ============================================================================
- * Introduction (v2.1.1 for MZ)
+ * Introduction (v2.1.2 for MZ)
  * ============================================================================
  * This plugin allows you to turn any event on your map into a source of sound.
  * As the player walks around and turns, the audio from the event will change
  * its volume and stereo position (panning) based on the player's distance
  * and orientation relative to the sound source.
+ *
+ * This version fixes a critical bug where the audio orientation was
+ * incorrectly tied to the player's movement direction instead of their
+ * facing direction. Now, moving backwards or strafing will result in correct
+ * and intuitive audio panning.
  * ============================================================================
  * How to Use
  * ============================================================================
@@ -247,7 +252,7 @@
  *
  *    There are four "Set" commands, one for each audio type (BGS, BGM, SE,
  *    ME). Using the correct one will conveniently open the file browser
- *    in the right folder!
+ * a   in the right folder!
  *
  *    - Set BGS/BGM/SE/ME Emittance
  *    - Clear Sound Emittance
@@ -394,11 +399,9 @@
         if (this._sEmittance) {
             if ($_soundEmittances.some(e => e._evEmittance === this._sEmittance)) return;
 
-            // --- FIX START ---
             // Construct the full path with the correct audio extension.
             const url = `audio/${this._sEmittance.filename}${AudioManager.audioFileExt()}`;
             const emittance = new WebAudio(url);
-            // --- FIX END ---
             
             emittance._evEmittance = this._sEmittance;
             emittance.volume = this._sEmittance.baseVolume;
@@ -485,32 +488,27 @@
     
     const SoundEmittance = {
         getPlayerAngle() {
-            const dir8 = Input.dir8;
-            if (dir8 > 0) {
-                switch (dir8) {
-                    case 8: return 0;
-                    case 9: return Math.PI / 4;
-                    case 6: return Math.PI / 2;
-                    case 3: return 3 * Math.PI / 4;
-                    case 2: return Math.PI;
-                    case 1: return 5 * Math.PI / 4;
-                    case 4: return 3 * Math.PI / 2;
-                    case 7: return 7 * Math.PI / 4;
-                }
-            }
+            // FIX: The listener's orientation must be tied to the player's FACING
+            // direction, not their MOVEMENT direction. The original code used
+            // Input.dir8, which caused incorrect panning when moving backwards.
+            // $gamePlayer.direction() correctly stores the character's orientation.
             switch ($gamePlayer.direction()) {
-                case 8: return 0;
-                case 6: return Math.PI / 2;
-                case 2: return Math.PI;
-                case 4: return 3 * Math.PI / 2;
+                case 8: return 0;                       // Up (North)
+                case 6: return Math.PI / 2;             // Right (East)
+                case 2: return Math.PI;                 // Down (South)
+                case 4: return 3 * Math.PI / 2;         // Left (West)
+                // Diagonal directions could be added here if a plugin modifies player facing.
             }
-            return 0;
+            return 0; // Default facing North
         },
         transformCoordinates(deltaX, deltaY, playerAngleRad) {
             const cos = Math.cos(playerAngleRad);
             const sin = Math.sin(playerAngleRad);
             const pannerX = deltaX * cos + deltaY * sin;
-            const pannerZ = deltaX * sin - deltaY * cos;
+            // FIX: The original formula inverted the front/back (Z-axis) positioning.
+            // This corrected formula properly rotates the coordinates into the listener's space,
+            // where the listener faces the negative Z-axis.
+            const pannerZ = deltaY * cos - deltaX * sin;
             return { x: pannerX, z: pannerZ };
         }
     };
