@@ -569,10 +569,18 @@
     const _Scene_Map_terminate = Scene_Map.prototype.terminate;
     Scene_Map.prototype.terminate = function() {
         _Scene_Map_terminate.apply(this, arguments);
+        // [FIX START]
+        // This logic is being removed. Sound cleanup is already handled by the alias
+        // on Game_Map.setup, which is the correct place for it as sounds are tied
+        // to map events. Stopping sounds here can cause them to incorrectly stop
+        // when opening a menu or other scenes that might terminate the map scene.
+        /*
         if ($_soundEmittances) {
             $_soundEmittances.forEach(e => e.stop());
             $_soundEmittances = [];
         }
+        */
+        // [FIX END]
     };
 
 })();
